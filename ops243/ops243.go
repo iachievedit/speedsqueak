@@ -185,10 +185,18 @@ func main() {
 
 	initOPS243(port)
 
-	// Get speed
+	lastEvent := time.Now().Unix()
+
+	// Get speeding events
 	for {
 		reading := readPort(port)
 		speed, _ := strconv.ParseFloat(reading, 64)
+
+		now := time.Now().Unix()
+
+		if now-lastEvent < 5 {
+			continue
+		}
 
 		event := SpeedEvent{
 			Type:      "speed",
@@ -203,6 +211,7 @@ func main() {
 			log.Panic(err)
 		} else {
 			_, err := publisher.Send(fmt.Sprintf("%s %s", topic, string(jsonData)), 0)
+			lastEvent = now
 			if err != nil {
 				log.Panic(err)
 			}

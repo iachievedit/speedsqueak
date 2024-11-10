@@ -2,7 +2,7 @@ import zmq
 import json
 import time
 from picamera2 import Picamera2
-from PIL import Image
+from PIL import Image, ImageOps
 
 def main():
 
@@ -46,8 +46,11 @@ def main():
             print("Image captured")
    
             img = Image.fromarray(image).convert("RGB")
-            uuid = data['uuid']
-            filename = f"capture_{uuid}.jpg"
+            img = ImageOps.flip(img)
+            uuid      = data['uuid']
+            timestamp = data['timestamp']
+            reading   = data['reading']
+            filename = f"./images/capture_speed={reading}_{timestamp}.jpg"
             img.save(filename)
             print(f"Image saved as {filename}")
 
