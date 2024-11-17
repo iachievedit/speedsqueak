@@ -1,0 +1,5 @@
+pyzmq
+structlog
+azure-storage-blob
+snowflake-connector-python
+python-dotenv

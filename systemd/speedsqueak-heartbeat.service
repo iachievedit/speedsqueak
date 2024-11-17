@@ -1,0 +1,15 @@
+[Unit]
+Description = speedsqueak-heartbeat
+After = network-online.target
+
+[Service]
+User = squeak
+Group = squeak
+Type = simple
+#WorkingDirectory=/usr/local/src/speedsqueak/heartbeat
+ExecStart=/usr/local/bin/speedsqueak-heartbeat.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

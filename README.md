@@ -13,5 +13,9 @@ sudo apt-get update && sudo apt-get install -y \
 
 ## ZeroMQ Topics
 
-`speed/event`
-`camera/event`
+| Publisher | Port | Event | Subscriber(s) |
+|-----------|--|-----|---------------|
+| `ops243` | 11205 | `event/speed`  | `camera` `uploader` | 
+| `camera` | 11206 | `event/camera` | `uploader` |
+| `heartbeat` | 11207 | `event/heartbeat` | `uploader` |
+

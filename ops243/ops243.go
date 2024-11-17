@@ -22,12 +22,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/pebbe/zmq4"
+	"github.com/rs/zerolog"
 	"go.bug.st/serial"
 )
 
@@ -42,6 +45,8 @@ const (
 	USBActive = "{\"USB\" : \"USB Interface Active\""
 )
 
+var logger zerolog.Logger
+
 func B(s string) []byte {
 	return []byte(s)
 }
@@ -51,7 +56,13 @@ func readPort(port serial.Port) string {
 	n, _ := port.Read(buff)
 	opsStr := strings.TrimSpace(string(buff[:n]))
 
-	return opsStr
+	readingsArray := strings.Split(opsStr, "\r\n")
+	if len(readingsArray) > 0 {
+		return readingsArray[len(readingsArray)-1]
+	} else {
+		return ""
+	}
+
 }
 
 func readPortJSON(port serial.Port) string {
@@ -94,18 +105,19 @@ func initOPS243(port serial.Port) {
 	port.Write(B(PartNumber))
 
 	response := readPortJSON(port)
-	fmt.Print(response)
+	logger.Info().Msg(response)
 	if err := json.Unmarshal([]byte(response), &partNumber); err != nil {
 		log.Fatal("Fatal:  ", err)
 	}
 
 	OPS243.product = partNumber.Product
 
-	log.Print("Get serial number")
+	//log.Print("Get serial number")
 
 	port.Write(B(SerialNumber))
 	response = readPortJSON(port)
-	fmt.Print(response)
+	//fmt.Print(response)
+	logger.Info().Msg(response)
 	if err := json.Unmarshal([]byte(response), &serialNumber); err != nil {
 		log.Fatal("Fatal:  ", err)
 	}
@@ -114,7 +126,7 @@ func initOPS243(port serial.Port) {
 
 	// Set output units to miles per hour
 
-	fmt.Println("Setting speed units to miles per hour")
+	logger.Info().Msg("Setting speed units to miles per hour")
 
 	port.Write(B(MilesPerHour))
 	response = readPortJSON(port)
@@ -125,11 +137,11 @@ func initOPS243(port serial.Port) {
 
 	port.Write(B(SpeedFilter))
 	response = readPortJSON(port) // TODO:  Check for success
-	fmt.Println(response)
+	//fmt.Println(response)
 
-	fmt.Printf("Product:  %s, Serial:  %s\n", OPS243.product, OPS243.serial)
+	//fmt.Printf("Product:  %s, Serial:  %s\n", OPS243.product, OPS243.serial)
 
-	fmt.Println(OPS243.units)
+	//fmt.Println(OPS243.units)
 
 }
 
@@ -138,11 +150,28 @@ type SpeedEvent struct {
 	Type      string  `json:"type"`
 	Timestamp string  `json:"timestamp"`
 	Reading   float64 `json:"reading"`
+	Direction string  `json:"direction"`
 	Units     string  `json:"units"`
 	UUID      string  `json:"uuid"`
+	Raw       string  `json:"raw"`
 }
 
 func main() {
+
+	logFilePath := "/var/log/speedsqueak/ops243.log"
+
+	// Open the log file for writing
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer logFile.Close()
+
+	// Create a zerolog logger with file output
+	logger = zerolog.New(logFile).With().
+		Timestamp().
+		Str("service", "speedsqueak-radar").
+		Logger()
 
 	publisher, err := zmq4.NewSocket(zmq4.PUB)
 	if err != nil {
@@ -155,9 +184,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("ZeroMQ running")
+	logger.Info().Msg("ZeroMQ running")
 
-	topic := "speed/events"
+	topic := "event/speed"
 
 	mode := &serial.Mode{
 		BaudRate: 115200,
@@ -170,19 +199,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Synchronizing with OPS243 sensor")
-	ready := false
-	for !ready {
-		reading := readPort(port)
-		_, err := strconv.ParseFloat(reading, 64)
-		if err == nil {
-			fmt.Println("Receiving OPS243 readings, ready!")
-			ready = true
-		} else {
-			fmt.Println("Synchronizing")
-		}
-	}
-
 	initOPS243(port)
 
 	lastEvent := time.Now().Unix()
@@ -191,6 +207,13 @@ func main() {
 	for {
 		reading := readPort(port)
 		speed, _ := strconv.ParseFloat(reading, 64)
+
+		direction := "toward"
+
+		if speed < 0 {
+			direction = "away"
+			speed = math.Abs(speed)
+		}
 
 		now := time.Now().Unix()
 
@@ -202,8 +225,10 @@ func main() {
 			Type:      "speed",
 			Timestamp: time.Now().Format(time.RFC3339),
 			Reading:   speed,
+			Direction: direction,
 			Units:     "mph",
 			UUID:      uuid.NewString(),
+			Raw:       reading,
 		}
 
 		jsonData, err := json.Marshal(event)
@@ -215,7 +240,7 @@ func main() {
 			if err != nil {
 				log.Panic(err)
 			}
-			fmt.Println("Sent:  ", string(jsonData))
+			logger.Info().Interface("event", event).Msg("Reading sent")
 		}
 
 	}
