@@ -1,0 +1,46 @@
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy:latest
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /usr/share/nginx/html:/usr/share/nginx/html:rw
+      - /etc/nginx/certs:/etc/nginx/certs:rw
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./htpasswd:/etc/nginx/htpasswd:ro
+    environment:
+      DEFAULT_HOST: web.speedsqueak.com
+    restart:  unless-stopped
+
+  acme-companion:
+    image: nginxproxy/acme-companion:latest
+    container_name: acme-companion
+    depends_on:
+      - nginx-proxy
+    volumes:
+      - /etc/acme.sh:/etc/acme.sh
+      - /etc/nginx/certs:/etc/nginx/certs:rw
+      - /usr/share/nginx/html:/usr/share/nginx/html:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DEFAULT_EMAIL: feedback@iachieved.it
+      NGINX_PROXY_CONTAINER:  nginx-proxy
+    restart:  unless-stopped
+
+  speedsqueak-app:
+    build:
+      context: ./app
+    container_name: speedsqueak-app
+    environment:
+      HTTPS_METHOD: redirect
+      VIRTUAL_HOST: web.speedsqueak.com
+      LETSENCRYPT_HOST: web.speedsqueak.com
+      LETSENCRYPT_EMAIL: feedback@iachieved.it
+    expose:
+      - "3333"
+    depends_on:
+      - nginx-proxy
+      - acme-companion
+    restart:  unless-stopped
