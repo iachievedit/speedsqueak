@@ -1,5 +1,5 @@
 [Unit]
-Description = speedsqueak-radar
+Description = speedsqueak-leddisplay
 After = network-online.target
 
 [Service]
@@ -7,7 +7,7 @@ User = squeak
 Group = squeak
 Type = simple
 WorkingDirectory=/tmp
-ExecStart=/usr/local/bin/ops243
+ExecStart=/usr/local/bin/leddisplay
 Restart=always
 RestartSec=3
 
