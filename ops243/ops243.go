@@ -179,9 +179,9 @@ func main() {
 	}
 	defer publisher.Close()
 
-	err = publisher.Bind("tcp://*:11205")
+	err = publisher.Bind("tcp://0.0.0.0:11205")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error binding for ZMQ:  ", err)
 	}
 
 	logger.Info().Msg("ZeroMQ running")

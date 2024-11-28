@@ -11,12 +11,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <signal.h>
 #include <time.h>
 #include <math.h>
 
 #include <wiringPi.h>
 #include <zmq.h>
 #include <jansson.h>
+
+void clearLED();
 
 typedef uint8_t byte;
 
@@ -33,6 +36,11 @@ typedef uint8_t byte;
 byte segmentClock = 0;
 byte segmentLatch = 2;
 byte segmentData = 3;
+
+void clearLED_and_exit(int signal) {
+  clearLED();
+  exit(0);
+}
 
 // Given a number, or '-', shifts it out to the display
 void postNumber(byte number, bool decimal) {
@@ -76,19 +84,14 @@ void postNumber(byte number, bool decimal) {
 void showNumber(float value) {
 
   int number = abs(value); 
-
   for (unsigned x = 0 ; x < 2 ; x++) {
-
     int remainder = number % 10;
-
     if (!remainder) {
       postNumber(' ', false);
     } else {
       postNumber(remainder, false);
     }
-
     number /= 10;
-
   }
 
   digitalWrite(segmentLatch, LOW);
@@ -103,7 +106,9 @@ void clearLED() {
 }
 
 void main() {
+  
   wiringPiSetup();
+  signal(SIGINT, clearLED_and_exit);
   clearLED();
 
   void* context = zmq_ctx_new();
